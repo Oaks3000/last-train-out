@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Last Train Out</title>
+<meta name="description" content="A one-phone family deduction game. Find the murderer before the last train leaves.">
+<meta name="theme-color" content="#143d2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Last Train">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Limelight&family=Jost:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one phone lying on a card-table baize; every screen is a single centred column of ivory cards and brass labels. Deliberately single-theme (dark baize). */
+:root{
+  --baize:#143d2e; --baize-deep:#0c2a1f; --baize-line:#22533f;
+  --ivory:#f2ebd9; --ivory-dim:#d9cfb7; --ink:#1d1b17; --ink-soft:#5b5447;
+  --brass:#d4ad55; --brass-dim:#9c7f3d; --mist:#b4c8bc; --mist-dim:#7f9a8c;
+  --blood:#b0352f; --blood-hi:#cf4a41; --board:#0a0d0b; --amber:#f2b33d;
+  --display:"Limelight","Georgia",serif;
+  --body:"Jost","Futura","Century Gothic","Trebuchet MS",sans-serif;
+  color-scheme:dark;
+}
+html,body{min-height:100%}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{background:var(--baize);background-image:radial-gradient(ellipse at 50% 30%,#1a4a38 0%,var(--baize) 55%,var(--baize-deep) 100%);background-attachment:fixed;color:var(--ivory);font-family:var(--body);font-size:16px;line-height:1.45}
+#app{max-width:520px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{margin:0;text-wrap:balance;font-weight:400}
+h1{font-family:var(--display);font-size:2.6rem;line-height:1;color:var(--brass);letter-spacing:.02em}
+h2{font-family:var(--display);font-size:1.7rem;line-height:1.1;color:var(--ivory)}
+h3{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--brass);font-weight:600}
+p{margin:0}
+.muted{color:var(--mist)}
+.small{font-size:.86rem}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.center{text-align:center;align-items:center}
+button{font:inherit;cursor:pointer;border:0;border-radius:12px;padding:14px 18px;font-weight:600;font-size:1rem;color:var(--ink);background:var(--ivory);transition:transform .08s,background .15s}
+button:active{transform:scale(.97)}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+button.primary{background:var(--brass);color:var(--ink)}
+button.ghost{background:transparent;color:var(--mist);border:1px solid var(--baize-line)}
+button.wide{width:100%}
+button:disabled{opacity:.4;cursor:not-allowed;transform:none}
+input,textarea{font:inherit;border-radius:10px;border:1px solid var(--baize-line);background:var(--baize-deep);color:var(--ivory);padding:12px 14px;width:100%;box-sizing:border-box}
+.section{display:flex;flex-direction:column;gap:12px;padding-top:14px;border-top:1px solid var(--baize-line)}
+.eyebrow{font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;color:var(--mist-dim);font-weight:600}
+
+/* Departure board: the pile counter */
+.board{background:var(--board);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;box-shadow:inset 0 0 0 1px #222}
+.board .lbl{font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);font-weight:600;line-height:1.3}
+.board .lbl span{display:block;color:#8a7a55;letter-spacing:.1em}
+.flaps{display:flex;gap:3px}
+.flap{width:30px;height:42px;background:#1b1b18;border-radius:4px;display:grid;place-items:center;font-size:1.6rem;font-weight:600;color:var(--amber);font-variant-numeric:tabular-nums;position:relative}
+.flap::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:#000}
+
+/* Cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.card{background:var(--ivory);color:var(--ink);border-radius:10px;padding:10px 12px;text-align:left;display:flex;flex-direction:column;gap:4px;min-height:112px;box-shadow:0 2px 0 rgba(0,0,0,.25);border:2px solid transparent;font-weight:400}
+.card .t{font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--ink-soft);display:flex;justify-content:space-between;gap:6px}
+.card .n{font-family:var(--display);font-size:1.15rem;line-height:1.1}
+.card .x{font-size:.8rem;color:var(--ink-soft);line-height:1.3}
+.card.sel{border-color:var(--blood);transform:translateY(-3px);box-shadow:0 6px 0 rgba(0,0,0,.3)}
+.card.dead{opacity:.55}
+.pip{font-size:.9rem;line-height:1}
+.k-det .pip{color:#2d5c8a}.k-nsf .pip{color:var(--blood)}.k-cover .pip{color:#6b3f86}.k-chloro .pip{color:#4d6b5e}
+.k-delay .pip,.k-express .pip{color:#8a5a14}
+.card.back{background:repeating-linear-gradient(45deg,#7a2a26 0 6px,#8a312c 6px 12px);color:var(--ivory);align-items:center;justify-content:center;font-family:var(--display);font-size:1.6rem}
+.card.secret.murder{background:#2a0f0d;color:var(--ivory)} .card.secret.murder .t,.card.secret.murder .x{color:#e7b3ab}
+.card.secret.copycat{background:#2a1c33;color:var(--ivory)} .card.secret.copycat .t,.card.secret.copycat .x{color:#d6c0e6}
+
+/* Players on the table */
+.players{display:flex;flex-direction:column;gap:8px}
+.pl{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;padding:10px 12px;border-radius:10px;background:rgba(0,0,0,.18)}
+.pl.now{box-shadow:inset 0 0 0 2px var(--brass)}
+.pl .nm{font-weight:600;font-size:1.05rem;min-width:0}
+.pl .meta{font-size:.82rem;color:var(--mist);font-variant-numeric:tabular-nums}
+.slots{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}
+.slot{font-size:.76rem;padding:4px 8px;border-radius:6px;background:#7a2a26;color:var(--ivory-dim);min-width:22px;text-align:center}
+.slot.rev{background:var(--ivory);color:var(--ink)}
+.slot.rev.copycat{background:#cdb6dd}
+.tag{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--baize-deep);color:var(--brass);font-weight:600}
+
+/* Log */
+.log{display:flex;flex-direction:column;gap:6px;font-size:.9rem;color:var(--mist)}
+.log div:first-child{color:var(--ivory)}
+
+/* Slam window */
+.slam{background:var(--blood);color:var(--ivory);font-family:var(--display);font-size:2.2rem;padding:34px 18px;border-radius:18px;width:100%;box-shadow:0 6px 0 #6e1d19;letter-spacing:.02em}
+.slam:active{background:var(--blood-hi);box-shadow:0 2px 0 #6e1d19;transform:translateY(4px)}
+.fuse{height:10px;background:var(--baize-deep);border-radius:99px;overflow:hidden}
+.fuse i{display:block;height:100%;background:var(--amber);width:100%}
+.announce{background:var(--ivory);color:var(--ink);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:6px}
+.announce .who{font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);font-weight:700}
+.announce .what{font-family:var(--display);font-size:1.6rem;line-height:1.1}
+.announce .chain{font-size:.95rem;color:var(--blood);font-weight:600}
+
+/* Cover / pass screens */
+.cover{min-height:60vh;display:flex;flex-direction:column;justify-content:center;gap:18px;text-align:center}
+.cover .big{font-family:var(--display);font-size:2.4rem;color:var(--brass);line-height:1.05}
+
+/* Chips for roster */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--baize-deep);color:var(--ivory);border:1px solid var(--baize-line);padding:10px 14px;border-radius:999px;font-weight:500}
+.chip.on{background:var(--brass);color:var(--ink);border-color:var(--brass)}
+.chip .ord{display:inline-block;margin-right:6px;font-weight:700}
+
+/* Leaderboard */
+.lb{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.lb th{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mist-dim);text-align:right;font-weight:600;padding:6px 4px}
+.lb th:first-child,.lb td:first-child{text-align:left}
+.lb td{padding:9px 4px;border-top:1px solid var(--baize-line);text-align:right}
+.lb td.pts{font-weight:700;color:var(--brass);font-size:1.05rem}
+.lb tr:first-child td{border-top:0}
+details{border-top:1px solid var(--baize-line);padding-top:12px}
+summary{cursor:pointer;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--brass);font-weight:600}
+.rules{display:flex;flex-direction:column;gap:8px;margin-top:10px;font-size:.92rem;color:var(--mist)}
+.rules b{color:var(--ivory);font-weight:600}
+.notice{background:rgba(0,0,0,.22);border-radius:10px;padding:12px 14px;font-size:.92rem}
+.result{display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;align-items:center;font-variant-numeric:tabular-nums}
+.result .pts{font-weight:700;color:var(--brass);text-align:right}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}.card.sel{transform:none}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function(){
+'use strict';
+
+/* ---------- Content ---------- */
+const DETECTIVES=['Inspector Hale','Miss Lavender','Father Quill','Dr Okonjo','Colonel Rusk'];
+const MISDEEDS=['Forged the will','Pawned the family silver','Read the private letters','Lied about the alibi','Owed the victim money','Poisoned the prize roses','Bribed the stationmaster','Burned the diary','Cheated at bridge','Hid the revolver','Pocketed the pearls','Wrote the anonymous note','Swapped the medicine','Fixed the point-to-point','Sold the land twice','Faked the séance','Hid a second marriage','Stole the first-class ticket'];
+const CARDS={
+  det:{t:'Detective',pip:'◆',x:'Play two matching to make someone reveal a secret of their choice. Three matching: you pick one blind.'},
+  snoop:{t:'Event',n:'Snoop',pip:'●',x:'Look at the top three cards of the pile.'},
+  reshuffle:{t:'Event',n:'Shuffle the Pile',pip:'●',x:'Shuffle the draw pile.'},
+  lielow:{t:'Event',n:'Lie Low',pip:'●',x:'End your turn without drawing.'},
+  tip:{t:'Event',n:'Anonymous Tip',pip:'●',x:'Secretly see one random hidden secret of another player.'},
+  pick:{t:'Event',n:'Pickpocket',pip:'●',x:"Take a random card from another player's hand."},
+  nsf:{t:'Reaction',n:'Not so Fast!',pip:'✕',x:'Slam the red button to cancel a card as it is played.'},
+  cover:{t:'Devious',n:'Cover Your Tracks',pip:'▲',x:'Turn one of your revealed misdeeds face down again.'},
+  delay:{t:'Railway',n:'Signal Failure',pip:'■',x:'Delay the train: five cards from the discard go back on top of the pile.'},
+  express:{t:'Railway',n:'Express from Paddington',pip:'■',x:'Discard the top four cards unseen. If the Last Train Out is among them, the murderer escapes.'},
+  chloro:{t:'Event',n:'Chloroform',pip:'◐',x:'Another player misses their next turn.'},
+  escape:{t:'Escape',n:'Last Train Out',pip:'★',x:'The murderer escapes.'}
+};
+const DECK_SPEC=[['snoop',3],['reshuffle',2],['lielow',3],['tip',2],['pick',2],['nsf',7],['cover',4],['delay',2],['express',2],['chloro',2]];
+const MODS={
+  none:{n:'An ordinary evening',x:'No special rules tonight.'},
+  fog:{n:'Fog on the line',x:'No Snoop cards tonight. Lie Low takes their place.'},
+  fuse:{n:'Short fuse',x:'The Last Train Out is hidden in the top half of the pile, not the bottom third.'},
+  lips:{n:'Loose lips',x:'Everyone reveals one misdeed of their choice before play begins.'},
+  paper:{n:'Paper trail',x:'The case log does not record who played what.'}
+};
+const MOD_POOL=['none','none','fog','fuse','lips','paper'];
+const HAND=5, SLAM_MS=4000;
+
+/* ---------- Helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rnd=n=>Math.floor(Math.random()*n);
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const cname=c=>c.k==='det'?c.n:CARDS[c.k].n;
+const fmt=n=>(Math.round(n*10)/10).toString();
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+const unbacked=()=>Math.max(0,Store.games.length-lsGet('lto.backedUp',0));
+
+/* ---------- Persistent store: players + games ---------- */
+const Store={mode:'local',db:null,players:lsGet('lto.players',[]),games:lsGet('lto.games',[]),
+  cache(){lsSet('lto.players',this.players);lsSet('lto.games',this.games)},
+  findByName(name){const k=name.trim().toLowerCase();return this.players.find(p=>p.name.trim().toLowerCase()===k)},
+  async addPlayer(name){
+    name=name.trim().slice(0,24); if(!name) return null;
+    const ex=this.findByName(name); if(ex) return ex;
+    const p={id:uid('p'),name,createdAt:Date.now()};
+    this.players.push(p); this.cache();
+    if(this.db){try{await this.db.collection('players').doc(p.id).set({name:p.name,createdAt:p.createdAt})}catch(e){toast('Could not save '+name+' online. Kept on this phone.')}}
+    return p;
+  },
+  async addGame(rec){
+    if(this.games.some(g=>g.id===rec.id)) return;
+    this.games.push(rec); this.cache();
+    if(this.db){try{await this.db.collection('games').doc(rec.id).set(rec)}catch(e){toast('Score saved on this phone only.')}}
+  },
+  nameOf(id){const p=this.players.find(p=>p.id===id);return p?p.name:'?'},
+  async connect(){
+    try{
+      if(!window.claude||!window.claude.use) return;
+      const db=await window.claude.use('db'); if(!db) return;
+      this.db=db; this.mode='db';
+      const local={players:this.players.slice(),games:this.games.slice()};
+      let firstP=true, firstG=true;
+      db.collection('players').onSnapshot(s=>{
+        const remote=s.docs.map(d=>({id:d.id,...d.data()}));
+        if(firstP){firstP=false; local.players.filter(p=>!remote.some(r=>r.id===p.id)).forEach(p=>db.collection('players').doc(p.id).set({name:p.name,createdAt:p.createdAt||Date.now()}).catch(()=>{}));}
+        const merged=remote.concat(local.players.filter(p=>!remote.some(r=>r.id===p.id)));
+        this.players=merged; this.cache(); softRender();
+      },()=>{});
+      db.collection('games').onSnapshot(s=>{
+        const remote=s.docs.map(d=>({id:d.id,...d.data()}));
+        if(firstG){firstG=false; local.games.filter(g=>!remote.some(r=>r.id===g.id)).forEach(g=>db.collection('games').doc(g.id).set(g).catch(()=>{}));}
+        this.games=remote.concat(local.games.filter(g=>!remote.some(r=>r.id===g.id))); this.cache(); softRender();
+      },()=>{});
+    }catch(e){}
+  },
+  leaderboard(){
+    const t={};
+    this.games.forEach(g=>(g.players||[]).forEach(p=>{
+      const r=t[p.id]||(t[p.id]={id:p.id,name:p.name,pts:0,games:0,murders:0,escapes:0});
+      r.pts+=p.points||0; r.games++; if(p.role==='murderer'){r.murders++; if(g.outcome==='escaped') r.escapes++;}
+    }));
+    Object.values(t).forEach(r=>{const p=this.players.find(x=>x.id===r.id); if(p) r.name=p.name;});
+    return Object.values(t).sort((a,b)=>b.pts-a.pts||(b.pts/b.games)-(a.pts/a.games));
+  }
+};
+
+/* ---------- Game state ---------- */
+let G=null;              // current case
+let UI={screen:'home', sel:[], setup:[], pick:null, mods:lsGet('lto.mods',true), backup:false};
+function save(){lsSet('lto.game',G); lsSet('lto.ui',{screen:UI.screen,setup:UI.setup});}
+function log(msg,actor){ if(!G) return; const m=(G.mod==='paper'&&actor)?msg.replace(actor,'Someone'):msg; G.log.unshift(m); if(G.log.length>60) G.log.pop(); }
+const P=i=>G.players[i];
+const cur=()=>G.players[G.turn];
+function go(screen,extra){UI.screen=screen; if(extra) Object.assign(UI,extra); UI.sel=[]; save(); render(); window.scrollTo(0,0);}
+
+function buildDeck(mod){
+  const d=[];
+  DETECTIVES.forEach(n=>{for(let i=0;i<4;i++) d.push({id:uid('c'),k:'det',n})});
+  DECK_SPEC.forEach(([k,c])=>{ const kk=(mod==='fog'&&k==='snoop')?'lielow':k; for(let i=0;i<c;i++) d.push({id:uid('c'),k:kk}) });
+  return shuffle(d);
+}
+
+function startCase(ids){
+  const n=ids.length;
+  const players=ids.map(id=>({id,name:Store.nameOf(id),role:'innocent',secrets:[],hand:[],skip:0}));
+  const m=rnd(n); players[m].role='murderer';
+  const hasCopy=n>=4&&Math.random()<0.5;
+  let c=-1; if(hasCopy){do{c=rnd(n)}while(c===m); players[c].role='copycat';}
+  const mis=shuffle(MISDEEDS.slice());
+  players.forEach(p=>{
+    if(p.role==='murderer') p.secrets.push({t:'murder',name:'The Murder',rev:false});
+    if(p.role==='copycat') p.secrets.push({t:'copycat',name:'The Copycat',rev:false});
+    while(p.secrets.length<3) p.secrets.push({t:'misdeed',name:mis.pop(),rev:false});
+    shuffle(p.secrets);
+  });
+  const mod=UI.mods?MOD_POOL[rnd(MOD_POOL.length)]:'none';
+  const deck=buildDeck(mod);
+  for(let r=0;r<HAND;r++) players.forEach(p=>p.hand.push(deck.shift()));
+  const L=deck.length;
+  const lo=mod==='fuse'?Math.floor(L/4):Math.ceil(L*2/3);
+  const hi=mod==='fuse'?Math.floor(L/2):L;
+  deck.splice(lo+rnd(hi-lo+1),0,{id:uid('c'),k:'escape'});
+  G={id:uid('g'),caseNo:Store.games.length+1,players,deck,discard:[],turn:rnd(n),mod,copycat:hasCopy,copycatCaught:false,log:[],setupIdx:0,lips:{},over:null,play:null,startedAt:Date.now()};
+  log('Case opened. '+MODS[mod].n+'.');
+  go('intro');
+}
+
+/* ---------- Turn flow ---------- */
+function canTarget(i,kind){
+  const p=P(i); if(i===G.turn) return false;
+  if(kind==='secret') return p.secrets.some(s=>!s.rev);
+  if(kind==='hand') return p.hand.length>0;
+  return true;
+}
+function selectionInfo(){
+  const me=cur(); const cards=UI.sel.map(id=>me.hand.find(c=>c.id===id)).filter(Boolean);
+  if(!cards.length) return {ok:false,msg:'Tap cards to select them.'};
+  if(cards.every(c=>c.k==='det')){
+    const same=cards.every(c=>c.n===cards[0].n);
+    if(!same) return {ok:false,msg:'Detective sets must match.'};
+    if(cards.length===1) return {ok:false,msg:'Add a matching detective to make a set.'};
+    if(cards.length>3) return {ok:false,msg:'Sets are two or three cards.'};
+    if(!G.players.some((p,i)=>canTarget(i,'secret'))) return {ok:false,msg:'Nobody has a hidden secret left.'};
+    return {ok:true,cards,kind:cards.length===2?'det2':'det3',target:'secret'};
+  }
+  if(cards.length>1) return {ok:false,msg:'Play one action card at a time.'};
+  const k=cards[0].k;
+  if(k==='nsf') return {ok:false,msg:'Not so Fast is only used by slamming the red button.'};
+  if(k==='cover'){ if(!me.secrets.some(s=>s.rev&&s.t==='misdeed')) return {ok:false,msg:'You have no revealed misdeed to cover.'}; return {ok:true,cards,kind:'cover',target:'own'}; }
+  if(k==='tip') return G.players.some((p,i)=>canTarget(i,'secret'))?{ok:true,cards,kind:k,target:'secret'}:{ok:false,msg:'Nobody has a hidden secret left.'};
+  if(k==='pick') return G.players.some((p,i)=>canTarget(i,'hand'))?{ok:true,cards,kind:k,target:'hand'}:{ok:false,msg:'Nobody has cards to steal.'};
+  if(k==='chloro') return {ok:true,cards,kind:k,target:'any'};
+  return {ok:true,cards,kind:k,target:null};
+}
+function beginPlay(){
+  const info=selectionInfo(); if(!info.ok) return;
+  UI.pick={kind:info.kind,cardIds:info.cards.map(c=>c.id),target:null,pos:null,cover:null,targetType:info.target};
+  if(!info.target) return commitPlay();
+  go('target');
+}
+function commitPlay(){
+  const me=cur(), pk=UI.pick;
+  const cards=pk.cardIds.map(id=>me.hand.find(c=>c.id===id));
+  me.hand=me.hand.filter(c=>!pk.cardIds.includes(c.id));
+  G.discard.push(...cards);
+  G.play={actor:G.turn,kind:pk.kind,cards,target:pk.target,pos:pk.pos,cover:pk.cover,cancelled:false,last:G.turn,chain:[]};
+  UI.pick=null;
+  startWindow();
+  go('slam');
+}
+function describePlay(pl){
+  const a=P(pl.actor).name, t=pl.target!=null?P(pl.target).name:'';
+  const nm=pl.kind.startsWith('det')?pl.cards.length+'× '+pl.cards[0].n:cname(pl.cards[0]);
+  let what=nm;
+  if(pl.kind==='det2') what=nm+' on '+t;
+  if(pl.kind==='det3') what=nm+' on '+t+' (blind pick)';
+  if(pl.kind==='tip'||pl.kind==='pick'||pl.kind==='chloro') what=nm+' on '+t;
+  return {who:a,what};
+}
+
+/* Slam window */
+let timer=null;
+function startWindow(){ G.play.endAt=Date.now()+SLAM_MS; G.play.picking=false; tick(); }
+function tick(){
+  clearInterval(timer);
+  timer=setInterval(()=>{
+    if(!G||!G.play||UI.screen!=='slam'){clearInterval(timer);return}
+    if(G.play.picking) return;
+    const left=G.play.endAt-Date.now(); const bar=$('#fuse');
+    if(bar) bar.style.width=Math.max(0,left/SLAM_MS*100)+'%';
+    if(left<=0){clearInterval(timer); resolvePlay();}
+  },50);
+}
+function slam(){ G.play.picking=true; G.play.paused=Math.max(0,G.play.endAt-Date.now()); render(); }
+function slamBy(i){
+  const pl=G.play, p=P(i); pl.picking=false;
+  const idx=p.hand.findIndex(c=>c.k==='nsf');
+  if(idx>=0){
+    G.discard.push(p.hand.splice(idx,1)[0]);
+    pl.cancelled=!pl.cancelled; pl.last=i;
+    pl.chain.push(p.name+' says Not so Fast!');
+    log(p.name+' played Not so Fast',p.name);
+  }else if(p.hand.length){
+    const lost=p.hand.splice(rnd(p.hand.length),1)[0]; G.discard.push(lost);
+    pl.chain.push(p.name+' bluffed a slam and drops a card');
+    log(p.name+' slammed without a Not so Fast and dropped '+cname(lost),p.name);
+  }else{
+    pl.chain.push(p.name+' slammed with an empty hand');
+  }
+  startWindow(); save(); render();
+}
+function slamCancel(){ G.play.picking=false; G.play.endAt=Date.now()+Math.max(1200,G.play.paused||0); render(); tick(); }
+
+function resolvePlay(){
+  const pl=G.play; const a=P(pl.actor); const d=describePlay(pl);
+  G.play=null;
+  if(pl.cancelled){ log(d.who+"'s "+d.what+' was cancelled',d.who); return cover(pl.actor,'Cancelled',d.what+' was stopped. Carry on with your turn.','hand'); }
+  log(d.who+' played '+d.what,d.who);
+  const T=pl.target!=null?P(pl.target):null;
+  switch(pl.kind){
+    case 'det2': return cover(pl.target,'Choose a secret to reveal',a.name+' has caught you out. Pick which of your secrets to show the table.','choose',{chooser:pl.target,actor:pl.actor});
+    case 'det3': { const hidden=T.secrets.filter(s=>!s.rev); return reveal(pl.target,T.secrets.indexOf(hidden[Math.min(pl.pos,hidden.length-1)]),pl.actor); }
+    case 'snoop': UI.private={title:'Top of the pile',cards:G.deck.slice(0,3)}; return cover(pl.actor,'Snoop','Only you should see the next screen.','private');
+    case 'tip': { const hidden=T.secrets.filter(s=>!s.rev); const s=hidden[rnd(hidden.length)]; UI.private={title:'A tip about '+T.name,secret:s}; return cover(pl.actor,'Anonymous Tip','Only you should see the next screen.','private'); }
+    case 'pick': { const c=T.hand.splice(rnd(T.hand.length),1)[0]; a.hand.push(c); UI.private={title:'You lifted from '+T.name,cards:[c]}; return cover(pl.actor,'Pickpocket','Only you should see the next screen.','private'); }
+    case 'reshuffle': shuffle(G.deck); return cover(pl.actor,'Pile shuffled','The draw pile has been shuffled.','hand');
+    case 'lielow': log(a.name+' lies low and does not draw',a.name); return endTurn();
+    case 'chloro': T.skip++; return cover(pl.actor,'Chloroform',T.name+' will miss their next turn.','hand');
+    case 'delay': {
+      const pool=G.discard.filter(c=>!pl.cards.includes(c)); shuffle(pool);
+      const back=pool.slice(0,5); G.discard=G.discard.filter(c=>!back.includes(c)); G.deck.unshift(...shuffle(back));
+      return cover(pl.actor,'Signal failure',back.length+' cards went back on top of the pile. The train is delayed.','hand');
+    }
+    case 'express': {
+      const gone=G.deck.splice(0,4); G.discard.push(...gone.filter(c=>c.k!=='escape'));
+      if(gone.some(c=>c.k==='escape')){ log('The express swept past the Last Train Out'); return gameOver('escaped','The Express from Paddington carried the murderer away.'); }
+      return cover(pl.actor,'Express from Paddington','Four cards vanished from the top of the pile.','hand');
+    }
+    case 'cover': { const s=a.secrets[pl.cover]; if(s){s.rev=false; shuffle(a.secrets);} return cover(pl.actor,'Tracks covered',a.name+' turned a misdeed face down again.','hand'); }
+  }
+}
+function reveal(pi,si,actor){
+  const p=P(pi), s=p.secrets[si]; s.rev=true;
+  if(s.t==='murder'){ log(p.name+' revealed The Murder'); return gameOver('caught',p.name+' revealed the murder card.'); }
+  if(s.t==='copycat'){ G.copycatCaught=true; log(p.name+' is the Copycat'); }
+  else log(p.name+' revealed: '+s.name);
+  UI.revealed={pi,si,actor}; go('reveal');
+}
+function cover(who,title,body,next,extra){ UI.cover={who,title,body,next,...(extra||{})}; go('cover'); }
+
+function draw(){
+  const me=cur(); const c=G.deck.shift();
+  if(!c||c.k==='escape'){ log(me.name+' drew the Last Train Out'); return gameOver('escaped',me.name+' drew the Last Train Out.'); }
+  me.hand.push(c); UI.drawn=c; go('drawn');
+}
+function endTurn(){
+  let n=G.players.length, i=G.turn;
+  for(let guard=0;guard<n*4;guard++){
+    i=(i+1)%n; const p=P(i);
+    if(p.skip>0){p.skip--; log(p.name+' is out cold and misses a turn'); continue;}
+    break;
+  }
+  G.turn=i; go('table');
+}
+
+/* Scoring */
+function gameOver(outcome,how){
+  const cc=G.copycatCaught;
+  const res=G.players.map(p=>{
+    let pts=0;
+    if(outcome==='caught'){ if(p.role==='innocent') pts=1+(cc?0.5:0); }
+    else { if(p.role==='murderer') pts=1; else if(p.role==='copycat') pts=cc?0.5:1; else pts=cc?0.5:0; }
+    return {id:p.id,name:p.name,role:p.role,points:pts};
+  });
+  G.over={outcome,how,res};
+  const rec={id:G.id,at:Date.now(),caseNo:G.caseNo,modifier:G.mod,copycat:G.copycat,copycatCaught:cc,outcome,players:res};
+  Store.addGame(rec);
+  G.play=null; go('over');
+}
+
+/* ---------- Rendering ---------- */
+function board(n){ const s=String(Math.max(0,n)).padStart(2,'0'); return `<div class="board" role="img" aria-label="${n} cards left in the pile"><div class="lbl">Last Train Out<span>cards on the pile</span></div><div class="flaps">${[...s].map(d=>`<div class="flap">${d}</div>`).join('')}</div></div>`; }
+function cardHTML(c,opts={}){
+  const d=CARDS[c.k]; const nm=c.k==='det'?c.n:d.n;
+  return `<button class="card k-${c.k} ${opts.sel?'sel':''} ${opts.dead?'dead':''}" ${opts.act?`data-act="${opts.act}" data-id="${c.id}"`:'tabindex="-1"'} aria-pressed="${!!opts.sel}"><span class="t"><span>${d.t}</span><span class="pip">${d.pip}</span></span><span class="n">${esc(nm)}</span><span class="x">${d.x}</span></button>`;
+}
+function secretHTML(s,opts={}){
+  const pub=opts.pub;
+  const label=s.t==='misdeed'?'Misdeed':pub?(s.t==='murder'?'Murder':'Copycat'):'Your secret';
+  const x=s.t==='murder'?(pub?'This player is the murderer.':'You did it. If this is revealed, you are caught.'):s.t==='copycat'?(pub?'This player is the copycat.':'You admire the murderer and want them to get away.'):(s.rev?'Revealed to the table':'Hidden');
+  return `<button class="card secret ${s.t} ${opts.sel?'sel':''}" ${opts.act?`data-act="${opts.act}" data-i="${opts.i}"`:'tabindex="-1"'}><span class="t"><span>${label}</span><span>${s.rev?'Face up':'Face down'}</span></span><span class="n">${esc(s.name)}</span><span class="x">${x}</span></button>`;
+}
+function playersHTML(){
+  return `<div class="players">${G.players.map((p,i)=>`<div class="pl ${i===G.turn?'now':''}"><div class="nm">${esc(p.name)} ${i===G.turn?'<span class="tag">Turn</span>':''} ${p.skip?'<span class="tag">Out cold</span>':''}</div><div class="meta">${p.hand.length} cards</div><div class="slots">${p.secrets.map(s=>s.rev?`<span class="slot rev ${s.t}">${esc(s.name)}</span>`:`<span class="slot" aria-label="hidden secret">?</span>`).join('')}</div></div>`).join('')}</div>`;
+}
+function logHTML(n=6){ return `<div class="log">${G.log.slice(0,n).map(l=>`<div>${esc(l)}</div>`).join('')}</div>`; }
+
+const R={};
+R.home=()=>{
+  const lb=Store.leaderboard(); const saved=G&&!G.over;
+  return `<div class="stack" style="gap:6px;padding-top:12px"><p class="eyebrow">A deduction game for one phone and a full table</p><h1>Last Train Out</h1></div>
+  <p class="muted">Everyone has something to hide. One of you is a murderer. Find them before they catch the last train.</p>
+  ${unbacked()?`<div class="notice row" style="justify-content:space-between"><span>${unbacked()} game${unbacked()===1?'':'s'} not backed up yet</span><button data-act="copybackup" style="padding:10px 14px">Copy scores</button></div>`:''}
+  ${saved?`<button class="primary wide" data-act="resume">Resume case no. ${G.caseNo}</button>`:''}
+  <button class="${saved?'':'primary'} wide" data-act="newcase">Open a new case</button>
+  <div class="section"><h3>Standings</h3>${lb.length?`<table class="lb"><thead><tr><th>Player</th><th>Pts</th><th>Games</th><th>Per game</th><th>Escapes</th></tr></thead><tbody>${lb.map(r=>`<tr><td>${esc(r.name)}</td><td class="pts">${fmt(r.pts)}</td><td>${r.games}</td><td>${fmt(r.pts/r.games)}</td><td>${r.escapes}/${r.murders}</td></tr>`).join('')}</tbody></table><p class="muted small">Escapes counts getaways out of games played as the murderer. ${Store.games.length} case${Store.games.length===1?'':'s'} closed${' on this phone'}.</p>`:`<p class="muted">No cases closed yet. Scores appear here after your first game.</p>`}</div>
+  <details><summary>How to play</summary><div class="rules">
+   <p><b>Setup.</b> Pass the phone round. Each player privately sees three secret cards. One holds The Murder. In half of all games with four or more players, someone else holds The Copycat: a superfan who knows who the murderer is and wants them to escape. The murderer never knows whether a copycat exists.</p>
+   <p><b>Your turn.</b> Pick up the phone, open your hand, play as many cards as you like, then draw one to end your turn. Lie Low ends your turn without drawing.</p>
+   <p><b>Reveals.</b> Two matching detectives force a player to reveal a secret of their choice. Three let you pick one of theirs blind.</p>
+   <p><b>Not so Fast.</b> Every play gets a four-second window. Grab the phone and slam the red button, then tap your name. If you hold a Not so Fast, the play is cancelled (and can be cancelled back). If you don't, you drop a random card.</p>
+   <p><b>The train.</b> The Last Train Out hides in the bottom third of the pile. Whoever draws it, the murderer escapes. Signal Failure puts five discarded cards back on top. The Express from Paddington throws away the top four, and if the train is among them, the murderer is gone.</p>
+   <p><b>Scoring.</b> Murderer caught: each innocent scores 1. Murderer escapes: the murderer scores 1 and the copycat 1. Catching the copycat adds 0.5 to each innocent and cuts the copycat's escape share to 0.5.</p>
+  </div></details>
+  <details ${UI.backup?'open':''}><summary>Back up scores</summary><div class="rules">
+   <p>Copy everything as text to keep somewhere safe, or paste a backup to restore it.</p>
+   <div class="row"><button data-act="copybackup">Copy backup</button></div>
+   <textarea id="restore" rows="3" placeholder="Paste a backup here"></textarea>
+   <button class="ghost" data-act="restore">Restore from pasted backup</button>
+  </div></details>`;
+};
+R.setup=()=>{
+  const sel=UI.setup;
+  return `<div class="row" style="justify-content:space-between"><h2>Who's at the table?</h2><button class="ghost" data-act="home">Back</button></div>
+  <p class="muted small">Tap players in seating order. Three to six players; tuned for four.</p>
+  <div class="chips">${Store.players.map(p=>{const o=sel.indexOf(p.id);return `<button class="chip ${o>=0?'on':''}" data-act="toggle" data-id="${p.id}">${o>=0?`<span class="ord">${o+1}</span>`:''}${esc(p.name)}</button>`}).join('')||'<p class="muted">Add your first player below.</p>'}</div>
+  <form id="addform" class="row" style="flex-wrap:nowrap"><input id="newname" maxlength="24" placeholder="Add a player" autocomplete="off"><button type="submit">Add</button></form>
+  <label class="row small" style="gap:8px"><input type="checkbox" id="mods" style="width:auto" ${UI.mods?'checked':''}> Draw a random case modifier each game</label>
+  <button class="primary wide" data-act="start" ${sel.length<3||sel.length>6?'disabled':''}>Deal the cards (${sel.length} players)</button>`;
+};
+R.intro=()=>`<div class="stack center" style="padding-top:10vh"><p class="eyebrow">Case no. ${G.caseNo}</p><h2>${MODS[G.mod].n}</h2><p class="muted">${MODS[G.mod].x}</p></div>
+  ${board(G.deck.length)}
+  <p class="muted small center" style="text-align:center">Each player will now look at their secrets in turn.</p>
+  <button class="primary wide" data-act="secretcover">Begin</button>`;
+R.cover=()=>{const c=UI.cover;return `<div class="cover"><p class="eyebrow">${esc(c.title)}</p><div class="big">Pass to ${esc(P(c.who).name)}</div><p class="muted">${esc(c.body)}</p><button class="primary wide" data-act="uncover">I'm ${esc(P(c.who).name)}. Show me</button></div>`};
+R.secret=()=>{
+  const i=G.setupIdx,p=P(i);
+  const mur=G.players.find(x=>x.role==='murderer');
+  let role= p.role==='murderer'?`<h2 style="color:var(--blood-hi)">You are the murderer.</h2><p class="muted">Keep The Murder hidden until the Last Train Out arrives. There may or may not be a copycat helping you. You will never be told.</p>`
+    : p.role==='copycat'?`<h2 style="color:#cdb6dd">You are the copycat.</h2><p class="muted">Your idol is <b style="color:var(--ivory)">${esc(mur.name)}</b>. They don't know you exist. Help them escape without getting caught yourself.</p>`
+    : `<h2>You are innocent of murder.</h2><p class="muted">Not of everything, though. Find the murderer before the last train leaves.</p>`;
+  const lips=G.mod==='lips';
+  return `<p class="eyebrow">${esc(p.name)}'s secrets</p>${role}
+  ${lips?`<p class="notice">Loose lips: tap one misdeed to reveal to the table.</p>`:''}
+  <div class="cards">${p.secrets.map((s,si)=>secretHTML(s,{act:lips&&s.t==='misdeed'?'lipspick':null,i:si,sel:G.lips[i]===si})).join('')}</div>
+  <button class="primary wide" data-act="secretdone" ${lips&&G.lips[i]==null?'disabled':''}>Hide and pass on</button>`;
+};
+R.table=()=>{
+  const me=cur();
+  return `<div class="row" style="justify-content:space-between"><p class="eyebrow">Case no. ${G.caseNo} · ${MODS[G.mod].n}</p><button class="ghost small" data-act="home" style="padding:8px 12px">Station</button></div>
+  ${board(G.deck.length)}
+  ${playersHTML()}
+  <button class="primary wide" data-act="openhand">I'm ${esc(me.name)}. Show my hand</button>
+  <div class="section"><h3>Case log</h3>${logHTML(8)}</div>`;
+};
+R.hand=()=>{
+  const me=cur(); const info=selectionInfo();
+  return `<div class="row" style="justify-content:space-between"><p class="eyebrow">${esc(me.name)}'s hand</p><button class="ghost small" data-act="hidehand" style="padding:8px 12px">Hide</button></div>
+  <div class="cards">${me.hand.map(c=>cardHTML(c,{act:'sel',sel:UI.sel.includes(c.id),dead:c.k==='nsf'})).join('')||'<p class="muted">Your hand is empty.</p>'}</div>
+  <p class="muted small">${esc(info.ok?'Ready to play.':info.msg)}</p>
+  <button class="primary wide" data-act="play" ${info.ok?'':'disabled'}>Play selected</button>
+  <button class="wide" data-act="draw">Draw a card and end turn</button>
+  <div class="section"><h3>Your secrets</h3><div class="cards">${me.secrets.map(s=>secretHTML(s)).join('')}</div></div>`;
+};
+R.target=()=>{
+  const pk=UI.pick, me=cur();
+  if(pk.targetType==='own'){
+    return `<h2>Cover which misdeed?</h2><div class="cards">${me.secrets.map((s,i)=>s.rev&&s.t==='misdeed'?secretHTML(s,{act:'coverpick',i}):'').join('')}</div><button class="ghost wide" data-act="backhand">Back</button>`;
+  }
+  const opts=G.players.map((p,i)=>({p,i})).filter(o=>canTarget(o.i,pk.targetType==='any'?'any':pk.targetType));
+  let blind='';
+  if(pk.kind==='det3'&&pk.target!=null){
+    const n=P(pk.target).secrets.filter(s=>!s.rev).length;
+    blind=`<h3>Pick one of ${esc(P(pk.target).name)}'s hidden secrets</h3><div class="cards">${Array.from({length:n},(_,k)=>`<button class="card back" data-act="blind" data-i="${k}">${k+1}</button>`).join('')}</div>`;
+  }
+  return `<h2>Choose a target</h2><div class="chips">${opts.map(o=>`<button class="chip ${pk.target===o.i?'on':''}" data-act="tgt" data-i="${o.i}">${esc(o.p.name)}</button>`).join('')}</div>${blind}<button class="ghost wide" data-act="backhand">Back</button>`;
+};
+R.slam=()=>{
+  const pl=G.play, d=describePlay(pl);
+  if(pl.picking){
+    return `<h2>Who slammed?</h2><div class="chips">${G.players.map((p,i)=>i===pl.last?'':`<button class="chip" data-act="slamby" data-i="${i}">${esc(p.name)}</button>`).join('')}</div><button class="ghost wide" data-act="slamcancel">Nobody, carry on</button>`;
+  }
+  return `<div class="announce"><span class="who">${esc(d.who)} plays</span><span class="what">${esc(d.what)}</span>${pl.chain.length?`<span class="chain">${pl.chain.map(esc).join('<br>')}<br>${pl.cancelled?'Currently cancelled':'Currently going ahead'}</span>`:''}</div>
+  <div class="fuse"><i id="fuse"></i></div>
+  <button class="slam" data-act="slam">Not so Fast!</button>
+  <p class="muted small" style="text-align:center">Put the phone in the middle. Anyone may grab it before the fuse runs out.</p>`;
+};
+R.choose=()=>{const c=UI.cover, p=P(c.chooser);return `<h2>Reveal which secret?</h2><p class="muted">The table will see the one you choose.</p><div class="cards">${p.secrets.map((s,i)=>s.rev?'':secretHTML(s,{act:'choosepick',i})).join('')}</div>`};
+R.reveal=()=>{const r=UI.revealed,p=P(r.pi),s=p.secrets[r.si];return `<div class="stack center" style="padding-top:6vh"><p class="eyebrow">${esc(p.name)} reveals</p></div><div style="max-width:240px;margin:0 auto;width:100%">${secretHTML(s,{pub:true})}</div>${s.t==='copycat'?`<p class="notice">The copycat is caught. Innocents bank half a point. The murderer is still at large.</p>`:''}<button class="primary wide" data-act="backto" data-i="${r.actor}">Back to ${esc(P(r.actor).name)}'s turn</button>`};
+R.private=()=>{const v=UI.private;return `<h2>${esc(v.title)}</h2>${v.cards?`<div class="cards">${v.cards.length?v.cards.map(c=>cardHTML(c)).join(''):'<p class="muted">The pile is empty.</p>'}</div>`:''}${v.secret?`<div style="max-width:240px">${secretHTML(v.secret,{pub:true})}</div>`:''}<p class="muted small">Remember it, then hide.</p><button class="primary wide" data-act="tohand">Back to my hand</button>`};
+R.drawn=()=>`<p class="eyebrow">You drew</p><div style="max-width:240px;width:100%">${cardHTML(UI.drawn)}</div><p class="muted">The train hasn't come. Yet.</p><button class="primary wide" data-act="endturn">End turn and put the phone down</button>`;
+R.over=()=>{
+  const o=G.over, mur=G.players.find(p=>p.role==='murderer'), cc=G.players.find(p=>p.role==='copycat');
+  const caught=o.outcome==='caught';
+  return `<div class="stack" style="padding-top:6vh;gap:8px"><p class="eyebrow">Case no. ${G.caseNo} closed</p><h1 style="font-size:2.2rem;color:${caught?'var(--brass)':'var(--blood-hi)'}">${caught?'The murderer is caught':'The murderer caught the last train'}</h1><p class="muted">${esc(o.how)}</p></div>
+  <p class="notice">${esc(mur.name)} was the murderer. ${cc?esc(cc.name)+' was the copycat'+(G.copycatCaught?', and was caught.':', and was never caught.'):'There was no copycat this time.'}</p>
+  <div class="result">${o.res.map(r=>`<span>${esc(r.name)}</span><span class="muted small">${r.role==='murderer'?'Murderer':r.role==='copycat'?'Copycat':'Innocent'}</span><span class="pts">+${fmt(r.points)}</span>`).join('')}</div>
+  <div class="notice stack"><span>Copy the scores and paste them into Notes, so a phone clear-out can't wipe the standings.</span><button data-act="copybackup">Copy scores</button></div>
+  <button class="primary wide" data-act="again">Another case, same table</button>
+  <button class="wide" data-act="home">Back to the station</button>`;
+};
+
+function render(){ if(!G&&!['home','setup'].includes(UI.screen)) UI.screen='home'; $('#app').innerHTML=(R[UI.screen]||R.home)(); if(UI.screen==='slam'&&G&&G.play&&!G.play.picking) tick(); }
+function softRender(){ if(['home','setup','over'].includes(UI.screen)) render(); }
+
+let toastT=null;
+function toast(msg){ let t=$('#toast'); if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--board);color:var(--amber);padding:10px 16px;border-radius:10px;font-size:.9rem;z-index:20;max-width:calc(100% - 32px)';document.body.appendChild(t);} t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,2600); }
+
+/* ---------- Events ---------- */
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-act]'); if(!b||b.disabled) return;
+  const a=b.dataset.act, id=b.dataset.id, i=b.dataset.i!=null?+b.dataset.i:null;
+  switch(a){
+    case 'home': go('home'); break;
+    case 'resume': go(G.play?'slam':(UI.screen==='home'?'table':UI.screen)); if(G.play) startWindow(); break;
+    case 'newcase': UI.setup=G?G.players.map(p=>p.id).filter(id=>Store.players.some(p=>p.id===id)):UI.setup; go('setup'); break;
+    case 'toggle': { const k=UI.setup.indexOf(id); if(k>=0) UI.setup.splice(k,1); else if(UI.setup.length<6) UI.setup.push(id); render(); break; }
+    case 'start': startCase(UI.setup.slice()); break;
+    case 'again': startCase(G.players.map(p=>p.id)); break;
+    case 'secretcover': G.setupIdx=0; cover(0,'Secrets','Make sure nobody else can see the screen.','secret'); break;
+    case 'uncover': { const c=UI.cover; if(c.next==='secret') go('secret'); else if(c.next==='choose') go('choose'); else if(c.next==='private') go('private'); else go('hand'); break; }
+    case 'lipspick': G.lips[G.setupIdx]=i; render(); break;
+    case 'secretdone': {
+      if(G.setupIdx<G.players.length-1){ G.setupIdx++; cover(G.setupIdx,'Secrets','Make sure nobody else can see the screen.','secret'); }
+      else { if(G.mod==='lips') G.players.forEach((p,pi)=>{const s=p.secrets[G.lips[pi]]; if(s){s.rev=true; log(p.name+' admits: '+s.name);}}); log(cur().name+' goes first'); go('table'); }
+      break; }
+    case 'openhand': go('hand'); break;
+    case 'hidehand': go('table'); break;
+    case 'sel': { const k=UI.sel.indexOf(id); if(k>=0) UI.sel.splice(k,1); else UI.sel.push(id); const s=UI.sel.slice(); render(); UI.sel=s; break; }
+    case 'play': beginPlay(); break;
+    case 'backhand': UI.pick=null; go('hand'); break;
+    case 'tgt': UI.pick.target=i; if(UI.pick.kind==='det3'){ render(); } else commitPlay(); break;
+    case 'blind': UI.pick.pos=i; commitPlay(); break;
+    case 'coverpick': UI.pick.cover=i; commitPlay(); break;
+    case 'slam': slam(); break;
+    case 'slamby': slamBy(i); break;
+    case 'slamcancel': slamCancel(); break;
+    case 'choosepick': { const c=UI.cover; reveal(c.chooser,i,c.actor); break; }
+    case 'backto': cover(i,'Back to the turn','Carry on playing cards, or draw to end your turn.','hand'); break;
+    case 'tohand': go('hand'); break;
+    case 'draw': draw(); break;
+    case 'endturn': endTurn(); break;
+    case 'copybackup': {
+      const txt=JSON.stringify({lastTrainOut:1,players:Store.players,games:Store.games});
+      try{ await navigator.clipboard.writeText(txt); lsSet('lto.backedUp',Store.games.length); toast('Scores copied. Paste them into Notes'); softRender(); }
+      catch(err){ const ta=$('#restore'); ta.value=txt; ta.select(); toast('Select all and copy the text in the box'); }
+      break; }
+    case 'restore': {
+      try{ const d=JSON.parse($('#restore').value);
+        if(!d||!Array.isArray(d.players)||!Array.isArray(d.games)) throw 0;
+        for(const p of d.players){ if(!Store.players.some(x=>x.id===p.id)){ Store.players.push(p); if(Store.db) await Store.db.collection('players').doc(p.id).set({name:p.name,createdAt:p.createdAt||Date.now()}).catch(()=>{}); } }
+        for(const g of d.games) await Store.addGame(g);
+        Store.cache(); toast('Backup restored'); render();
+      }catch(err){ toast('That text is not a Last Train Out backup'); }
+      break; }
+  }
+});
+document.addEventListener('submit',async e=>{
+  if(e.target.id!=='addform') return; e.preventDefault();
+  const v=$('#newname').value; const p=await Store.addPlayer(v);
+  if(p&&!UI.setup.includes(p.id)&&UI.setup.length<6) UI.setup.push(p.id);
+  render(); const inp=$('#newname'); if(inp) inp.focus();
+});
+document.addEventListener('change',e=>{ if(e.target.id==='mods'){UI.mods=e.target.checked; lsSet('lto.mods',UI.mods);} });
+
+/* ---------- Boot ---------- */
+function start(data){
+  const saved=(data&&data.G!==undefined)?data.G:lsGet('lto.game',null);
+  if(saved&&saved.players){ G=saved; if(G.over) G=null; }
+  const su=(data&&data.UI)||lsGet('lto.ui',null);
+  if(su&&su.setup) UI.setup=su.setup.filter(Boolean);
+  UI.screen='home';
+  render();
+  Store.connect();
+}
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
+start({});
+})();
+</script>
+</body>
+</html>

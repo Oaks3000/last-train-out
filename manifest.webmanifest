@@ -1,0 +1,16 @@
+{
+  "name": "Last Train Out",
+  "short_name": "Last Train",
+  "description": "A one-phone family deduction game. Find the murderer before the last train leaves.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c2a1f",
+  "theme_color": "#143d2e",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
