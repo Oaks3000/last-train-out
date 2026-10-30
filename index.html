@@ -137,7 +137,16 @@ summary{cursor:pointer;font-size:.78rem;letter-spacing:.14em;text-transform:uppe
 'use strict';
 
 /* ---------- Content ---------- */
-const DETECTIVES=['Inspector Hale','Miss Lavender','Father Quill','Dr Okonjo','Colonel Rusk'];
+const DETECTIVES=[['Inspector Ada Hale',4],['Dr Grace Okonjo',3],['Miss Lavender',4],['Sister Quill',4],['Colonel Rusk',4]];
+const POWERS={
+  'Inspector Ada Hale':{s:'By the book',x:'Two: a player reveals a secret of their choice. Three: you pick one of theirs blind.'},
+  'Dr Grace Okonjo':{s:'Forensics',x:"Two: pick one of a player's secrets blind. Three: you also secretly see another of their hidden secrets."},
+  'Miss Lavender':{s:'Keeps secrets',x:"Two: turn one of your revealed misdeeds face down, or take another player's revealed misdeed and hide it in your pile. Three: do both."},
+  'Sister Quill':{s:'Hears confessions',x:'Two: a player reveals a secret of their choice. Three: you pick blind. Not so Fast cannot stop her.'},
+  'Colonel Rusk':{s:'Blunt instrument',x:'Two: two different players each reveal a secret of their choice. Three: you pick blind from both.'}
+};
+const detOf=n=>POWERS[n]?n:'Inspector Ada Hale';
+const isBlind=pl=>pl.n==='Dr Grace Okonjo'||pl.size===3;
 const MISDEEDS=['Forged the will','Pawned the family silver','Read the private letters','Lied about the alibi','Owed the victim money','Poisoned the prize roses','Bribed the stationmaster','Burned the diary','Cheated at bridge','Hid the revolver','Pocketed the pearls','Wrote the anonymous note','Swapped the medicine','Fixed the point-to-point','Sold the land twice','Faked the séance','Hid a second marriage','Stole the first-class ticket'];
 const CARDS={
   det:{t:'Detective',pip:'◆',x:'Play two matching to make someone reveal a secret of their choice. Three matching: you pick one blind.'},
@@ -236,7 +245,7 @@ function go(screen,extra){UI.screen=screen; if(extra) Object.assign(UI,extra); U
 
 function buildDeck(mod){
   const d=[];
-  DETECTIVES.forEach(n=>{for(let i=0;i<4;i++) d.push({id:uid('c'),k:'det',n})});
+  DETECTIVES.forEach(([n,c])=>{for(let i=0;i<c;i++) d.push({id:uid('c'),k:'det',n})});
   DECK_SPEC.forEach(([k,c])=>{ const kk=(mod==='fog'&&k==='snoop')?'lielow':k; for(let i=0;i<c;i++) d.push({id:uid('c'),k:kk}) });
   return shuffle(d);
 }
@@ -281,8 +290,17 @@ function selectionInfo(){
     if(!same) return {ok:false,msg:'Detective sets must match.'};
     if(cards.length===1) return {ok:false,msg:'Add a matching detective to make a set.'};
     if(cards.length>3) return {ok:false,msg:'Sets are two or three cards.'};
-    if(!G.players.some((p,i)=>canTarget(i,'secret'))) return {ok:false,msg:'Nobody has a hidden secret left.'};
-    return {ok:true,cards,kind:cards.length===2?'det2':'det3',target:'secret'};
+    const n=detOf(cards[0].n), size=cards.length;
+    const hiddenOthers=G.players.filter((p,i)=>canTarget(i,'secret')).length;
+    if(n==='Miss Lavender'){
+      const own=me.secrets.some(x=>x.rev&&x.t==='misdeed');
+      const others=G.players.some((p,i)=>i!==G.turn&&p.secrets.some(x=>x.rev&&x.t==='misdeed'));
+      if(!own&&!others) return {ok:false,msg:'There are no revealed misdeeds to hide or take yet.'};
+      return {ok:true,cards,kind:'det',n,size,target:'lav'};
+    }
+    if(n==='Colonel Rusk'){ if(hiddenOthers<2) return {ok:false,msg:'Colonel Rusk needs two other players with hidden secrets.'}; return {ok:true,cards,kind:'det',n,size,target:'two'}; }
+    if(!hiddenOthers) return {ok:false,msg:'Nobody has a hidden secret left.'};
+    return {ok:true,cards,kind:'det',n,size,target:'secret'};
   }
   if(cards.length>1) return {ok:false,msg:'Play one action card at a time.'};
   const k=cards[0].k;
@@ -295,7 +313,7 @@ function selectionInfo(){
 }
 function beginPlay(){
   const info=selectionInfo(); if(!info.ok) return;
-  UI.pick={kind:info.kind,cardIds:info.cards.map(c=>c.id),target:null,pos:null,cover:null,targetType:info.target};
+  UI.pick={kind:info.kind,n:info.n,size:info.size,cardIds:info.cards.map(c=>c.id),target:null,targets:[],lavCover:null,lavSteal:null,cover:null,targetType:info.target};
   if(!info.target) return commitPlay();
   go('target');
 }
@@ -304,17 +322,20 @@ function commitPlay(){
   const cards=pk.cardIds.map(id=>me.hand.find(c=>c.id===id));
   me.hand=me.hand.filter(c=>!pk.cardIds.includes(c.id));
   G.discard.push(...cards);
-  G.play={actor:G.turn,kind:pk.kind,cards,target:pk.target,pos:pk.pos,cover:pk.cover,cancelled:false,last:G.turn,chain:[]};
+  G.play={actor:G.turn,kind:pk.kind,n:pk.n,size:pk.size,cards,target:pk.target,targets:pk.targets,lavCover:pk.lavCover,lavSteal:pk.lavSteal,cover:pk.cover,cancelled:false,last:G.turn,chain:[]};
   UI.pick=null;
+  if(pk.kind==='det'&&pk.n==='Sister Quill'){ return resolvePlay(); }
   startWindow();
   go('slam');
 }
 function describePlay(pl){
   const a=P(pl.actor).name, t=pl.target!=null?P(pl.target).name:'';
-  const nm=pl.kind.startsWith('det')?pl.cards.length+'× '+pl.cards[0].n:cname(pl.cards[0]);
+  const nm=pl.kind==='det'?pl.size+'× '+pl.n:cname(pl.cards[0]);
   let what=nm;
-  if(pl.kind==='det2') what=nm+' on '+t;
-  if(pl.kind==='det3') what=nm+' on '+t+' (blind pick)';
+  if(pl.kind==='det'){
+    if(pl.n==='Colonel Rusk') what=nm+' on '+pl.targets.map(i=>P(i).name).join(' and ')+(isBlind(pl)?' (blind picks)':'');
+    else if(pl.n!=='Miss Lavender') what=nm+' on '+t+(isBlind(pl)?' (blind pick)':'')+(pl.n==='Sister Quill'?'. It cannot be stopped':'');
+  }
   if(pl.kind==='tip'||pl.kind==='pick'||pl.kind==='chloro') what=nm+' on '+t;
   return {who:a,what};
 }
@@ -359,8 +380,21 @@ function resolvePlay(){
   log(d.who+' played '+d.what,d.who);
   const T=pl.target!=null?P(pl.target):null;
   switch(pl.kind){
-    case 'det2': return cover(pl.target,'Choose a secret to reveal',a.name+' has caught you out. Pick which of your secrets to show the table.','choose',{chooser:pl.target,actor:pl.actor});
-    case 'det3': { const hidden=T.secrets.filter(s=>!s.rev); return reveal(pl.target,T.secrets.indexOf(hidden[Math.min(pl.pos,hidden.length-1)]),pl.actor); }
+    case 'det': {
+      if(pl.n==='Miss Lavender'){
+        const msgs=[];
+        if(pl.lavCover!=null){ const x=a.secrets[pl.lavCover]; if(x&&x.rev){ x.rev=false; msgs.push(a.name+' turned "'+x.name+'" face down'); } }
+        if(pl.lavSteal){ const from=P(pl.lavSteal.from), x=from.secrets[pl.lavSteal.idx];
+          if(x&&x.rev&&x.t==='misdeed'){ from.secrets.splice(pl.lavSteal.idx,1); x.rev=false; a.secrets.push(x); msgs.push(a.name+' took "'+x.name+'" from '+from.name+' and hid it'); } }
+        shuffle(a.secrets); msgs.forEach(m=>log(m,a.name));
+        return cover(pl.actor,'Miss Lavender',msgs.join('. ')||'There was nothing left to hide.','hand');
+      }
+      const ts=pl.n==='Colonel Rusk'?pl.targets:[pl.target];
+      G.queue=ts.map(t=>({t,mode:isBlind(pl)?'blind':'choose'}));
+      if(pl.n==='Dr Grace Okonjo'&&pl.size===3) G.queue.push({t:pl.target,mode:'peek'});
+      G.queueActor=pl.actor;
+      return runQueue();
+    }
     case 'snoop': UI.private={title:'Top of the pile',cards:G.deck.slice(0,3)}; return cover(pl.actor,'Snoop','Only you should see the next screen.','private');
     case 'tip': { const hidden=T.secrets.filter(s=>!s.rev); const s=hidden[rnd(hidden.length)]; UI.private={title:'A tip about '+T.name,secret:s}; return cover(pl.actor,'Anonymous Tip','Only you should see the next screen.','private'); }
     case 'pick': { const c=T.hand.splice(rnd(T.hand.length),1)[0]; a.hand.push(c); UI.private={title:'You lifted from '+T.name,cards:[c]}; return cover(pl.actor,'Pickpocket','Only you should see the next screen.','private'); }
@@ -379,6 +413,17 @@ function resolvePlay(){
     }
     case 'cover': { const s=a.secrets[pl.cover]; if(s){s.rev=false; shuffle(a.secrets);} return cover(pl.actor,'Tracks covered',a.name+' turned a misdeed face down again.','hand'); }
   }
+}
+function runQueue(){
+  if(!G||G.over) return;
+  const actor=G.queueActor, it=(G.queue||[]).shift();
+  if(!it) return cover(actor,'Back to the turn','Carry on playing cards, or draw to end your turn.','hand');
+  const p=P(it.t), hidden=p.secrets.map((x,i)=>i).filter(i=>!p.secrets[i].rev);
+  if(!hidden.length) return runQueue();
+  if(it.mode==='choose') return cover(it.t,'Choose a secret to reveal',P(actor).name+' has caught you out. Pick which of your secrets to show the table.','choose',{chooser:it.t,actor});
+  if(it.mode==='blind') return reveal(it.t,hidden[rnd(hidden.length)],actor);
+  UI.private={title:'Under the microscope: '+p.name,secret:p.secrets[hidden[rnd(hidden.length)]]};
+  return cover(actor,'Dr Grace Okonjo','Only you should see the next screen.','private');
 }
 function reveal(pi,si,actor){
   const p=P(pi), s=p.secrets[si]; s.rev=true;
@@ -413,7 +458,7 @@ function gameOver(outcome,how){
     else { if(p.role==='murderer') pts=1; else if(p.role==='copycat') pts=cc?0.5:1; else pts=cc?0.5:0; }
     return {id:p.id,name:p.name,role:p.role,points:pts};
   });
-  G.over={outcome,how,res};
+  G.over={outcome,how,res}; G.queue=[];
   const rec={id:G.id,at:Date.now(),caseNo:G.caseNo,modifier:G.mod,copycat:G.copycat,copycatCaught:cc,outcome,players:res};
   Store.addGame(rec);
   G.play=null; go('over');
@@ -422,8 +467,8 @@ function gameOver(outcome,how){
 /* ---------- Rendering ---------- */
 function board(n){ const s=String(Math.max(0,n)).padStart(2,'0'); return `<div class="board" role="img" aria-label="${n} cards left in the pile"><div class="lbl">Last Train Out<span>cards on the pile</span></div><div class="flaps">${[...s].map(d=>`<div class="flap">${d}</div>`).join('')}</div></div>`; }
 function cardHTML(c,opts={}){
-  const d=CARDS[c.k]; const nm=c.k==='det'?c.n:d.n;
-  return `<button class="card k-${c.k} ${opts.sel?'sel':''} ${opts.dead?'dead':''}" ${opts.act?`data-act="${opts.act}" data-id="${c.id}"`:'tabindex="-1"'} aria-pressed="${!!opts.sel}"><span class="t"><span>${d.t}</span><span class="pip">${d.pip}</span></span><span class="n">${esc(nm)}</span><span class="x">${d.x}</span></button>`;
+  const d=CARDS[c.k]; const nm=c.k==='det'?c.n:d.n; const pw=c.k==='det'?POWERS[detOf(c.n)]:null;
+  return `<button class="card k-${c.k} ${opts.sel?'sel':''} ${opts.dead?'dead':''}" ${opts.act?`data-act="${opts.act}" data-id="${c.id}"`:'tabindex="-1"'} aria-pressed="${!!opts.sel}"><span class="t"><span>${pw?pw.s:d.t}</span><span class="pip">${d.pip}</span></span><span class="n">${esc(nm)}</span><span class="x">${esc(pw?pw.x:d.x)}</span></button>`;
 }
 function secretHTML(s,opts={}){
   const pub=opts.pub;
@@ -448,7 +493,12 @@ R.home=()=>{
   <details><summary>How to play</summary><div class="rules">
    <p><b>Setup.</b> Pass the phone round. Each player privately sees three secret cards. One holds The Murder. In half of all games with four or more players, someone else holds The Copycat: a superfan who knows who the murderer is and wants them to escape. The murderer never knows whether a copycat exists.</p>
    <p><b>Your turn.</b> Pick up the phone, open your hand, play as many cards as you like, then draw one to end your turn. Lie Low ends your turn without drawing.</p>
-   <p><b>Reveals.</b> Two matching detectives force a player to reveal a secret of their choice. Three let you pick one of theirs blind.</p>
+   <p><b>Detectives.</b> Play two or three matching detectives for their power.</p>
+   <p><b>Inspector Ada Hale:</b> two make a player reveal a secret of their choice; three let you pick blind.<br>
+   <b>Dr Grace Okonjo</b> (only three in the pile): two are a blind pick; three also let you secretly see another of that player's hidden secrets.<br>
+   <b>Miss Lavender:</b> two turn one of your revealed misdeeds face down, or take another player's revealed misdeed and hide it in your own pile; three do both.<br>
+   <b>Sister Quill:</b> like Hale, but Not so Fast cannot stop her.<br>
+   <b>Colonel Rusk:</b> two make two different players each reveal a secret of their choice; three are blind picks from both.</p>
    <p><b>Not so Fast.</b> Every play gets a four-second window. Grab the phone and slam the red button, then tap your name. If you hold a Not so Fast, the play is cancelled (and can be cancelled back). If you don't, you drop a random card.</p>
    <p><b>The train.</b> The Last Train Out hides in the bottom third of the pile. Whoever draws it, the murderer escapes. Signal Failure puts five discarded cards back on top. The Express from Paddington throws away the top four, and if the train is among them, the murderer is gone.</p>
    <p><b>Scoring.</b> Murderer caught: each innocent scores 1. Murderer escapes: the murderer scores 1 and the copycat 1. Catching the copycat adds 0.5 to each innocent and cuts the copycat's escape share to 0.5.</p>
@@ -506,15 +556,24 @@ R.hand=()=>{
 R.target=()=>{
   const pk=UI.pick, me=cur();
   if(pk.targetType==='own'){
-    return `<h2>Cover which misdeed?</h2><div class="cards">${me.secrets.map((s,i)=>s.rev&&s.t==='misdeed'?secretHTML(s,{act:'coverpick',i}):'').join('')}</div><button class="ghost wide" data-act="backhand">Back</button>`;
+    return `<h2>Cover which misdeed?</h2><div class="cards">${me.secrets.map((x,i)=>x.rev&&x.t==='misdeed'?secretHTML(x,{act:'coverpick',i}):'').join('')}</div><button class="ghost wide" data-act="backhand">Back</button>`;
   }
-  const opts=G.players.map((p,i)=>({p,i})).filter(o=>canTarget(o.i,pk.targetType==='any'?'any':pk.targetType));
-  let blind='';
-  if(pk.kind==='det3'&&pk.target!=null){
-    const n=P(pk.target).secrets.filter(s=>!s.rev).length;
-    blind=`<h3>Pick one of ${esc(P(pk.target).name)}'s hidden secrets</h3><div class="cards">${Array.from({length:n},(_,k)=>`<button class="card back" data-act="blind" data-i="${k}">${k+1}</button>`).join('')}</div>`;
+  if(pk.targetType==='lav'){
+    const own=me.secrets.map((x,i)=>({x,i})).filter(o=>o.x.rev&&o.x.t==='misdeed');
+    const others=[]; G.players.forEach((p,pi)=>{ if(pi===G.turn) return; p.secrets.forEach((x,si)=>{ if(x.rev&&x.t==='misdeed') others.push({p,pi,x,si}); }); });
+    const both=pk.size===3, any=pk.lavCover!=null||!!pk.lavSteal;
+    const ready=any&&(!both||((pk.lavCover!=null||!own.length)&&(pk.lavSteal||!others.length)));
+    return `<h2>Miss Lavender</h2><p class="muted small">${both?'Hide one of yours and take one of theirs.':'Choose one.'}</p>
+    ${own.length?`<h3>Turn yours face down</h3><div class="chips">${own.map(o=>`<button class="chip ${pk.lavCover===o.i?'on':''}" data-act="lavcover" data-i="${o.i}">${esc(o.x.name)}</button>`).join('')}</div>`:''}
+    ${others.length?`<h3>Take one and hide it in your pile</h3><div class="chips">${others.map(o=>`<button class="chip ${pk.lavSteal&&pk.lavSteal.from===o.pi&&pk.lavSteal.idx===o.si?'on':''}" data-act="lavsteal" data-i="${o.pi}" data-j="${o.si}">${esc(o.p.name)}: ${esc(o.x.name)}</button>`).join('')}</div>`:''}
+    <button class="primary wide" data-act="confirmplay" ${ready?'':'disabled'}>Play Miss Lavender</button><button class="ghost wide" data-act="backhand">Back</button>`;
   }
-  return `<h2>Choose a target</h2><div class="chips">${opts.map(o=>`<button class="chip ${pk.target===o.i?'on':''}" data-act="tgt" data-i="${o.i}">${esc(o.p.name)}</button>`).join('')}</div>${blind}<button class="ghost wide" data-act="backhand">Back</button>`;
+  const kind=pk.targetType==='two'?'secret':pk.targetType;
+  const opts=G.players.map((p,i)=>({p,i})).filter(o=>canTarget(o.i,kind));
+  if(pk.targetType==='two'){
+    return `<h2>Choose two players</h2><div class="chips">${opts.map(o=>`<button class="chip ${pk.targets.includes(o.i)?'on':''}" data-act="tgt2" data-i="${o.i}">${esc(o.p.name)}</button>`).join('')}</div><button class="primary wide" data-act="confirmplay" ${pk.targets.length===2?'':'disabled'}>Play Colonel Rusk</button><button class="ghost wide" data-act="backhand">Back</button>`;
+  }
+  return `<h2>Choose a target</h2><div class="chips">${opts.map(o=>`<button class="chip" data-act="tgt" data-i="${o.i}">${esc(o.p.name)}</button>`).join('')}</div><button class="ghost wide" data-act="backhand">Back</button>`;
 };
 R.slam=()=>{
   const pl=G.play, d=describePlay(pl);
@@ -527,7 +586,7 @@ R.slam=()=>{
   <p class="muted small" style="text-align:center">Put the phone in the middle. Anyone may grab it before the fuse runs out.</p>`;
 };
 R.choose=()=>{const c=UI.cover, p=P(c.chooser);return `<h2>Reveal which secret?</h2><p class="muted">The table will see the one you choose.</p><div class="cards">${p.secrets.map((s,i)=>s.rev?'':secretHTML(s,{act:'choosepick',i})).join('')}</div>`};
-R.reveal=()=>{const r=UI.revealed,p=P(r.pi),s=p.secrets[r.si];return `<div class="stack center" style="padding-top:6vh"><p class="eyebrow">${esc(p.name)} reveals</p></div><div style="max-width:240px;margin:0 auto;width:100%">${secretHTML(s,{pub:true})}</div>${s.t==='copycat'?`<p class="notice">The copycat is caught. Innocents bank half a point. The murderer is still at large.</p>`:''}<button class="primary wide" data-act="backto" data-i="${r.actor}">Back to ${esc(P(r.actor).name)}'s turn</button>`};
+R.reveal=()=>{const r=UI.revealed,p=P(r.pi),s=p.secrets[r.si];return `<div class="stack center" style="padding-top:6vh"><p class="eyebrow">${esc(p.name)} reveals</p></div><div style="max-width:240px;margin:0 auto;width:100%">${secretHTML(s,{pub:true})}</div>${s.t==='copycat'?`<p class="notice">The copycat is caught. Innocents bank half a point. The murderer is still at large.</p>`:''}<button class="primary wide" data-act="next">Continue</button>`};
 R.private=()=>{const v=UI.private;return `<h2>${esc(v.title)}</h2>${v.cards?`<div class="cards">${v.cards.length?v.cards.map(c=>cardHTML(c)).join(''):'<p class="muted">The pile is empty.</p>'}</div>`:''}${v.secret?`<div style="max-width:240px">${secretHTML(v.secret,{pub:true})}</div>`:''}<p class="muted small">Remember it, then hide.</p><button class="primary wide" data-act="tohand">Back to my hand</button>`};
 R.drawn=()=>`<p class="eyebrow">You drew</p><div style="max-width:240px;width:100%">${cardHTML(UI.drawn)}</div><p class="muted">The train hasn't come. Yet.</p><button class="primary wide" data-act="endturn">End turn and put the phone down</button>`;
 R.over=()=>{
@@ -570,8 +629,12 @@ document.addEventListener('click',async e=>{
     case 'sel': { const k=UI.sel.indexOf(id); if(k>=0) UI.sel.splice(k,1); else UI.sel.push(id); const s=UI.sel.slice(); render(); UI.sel=s; break; }
     case 'play': beginPlay(); break;
     case 'backhand': UI.pick=null; go('hand'); break;
-    case 'tgt': UI.pick.target=i; if(UI.pick.kind==='det3'){ render(); } else commitPlay(); break;
-    case 'blind': UI.pick.pos=i; commitPlay(); break;
+    case 'tgt': UI.pick.target=i; commitPlay(); break;
+    case 'tgt2': { const t=UI.pick.targets, k=t.indexOf(i); if(k>=0) t.splice(k,1); else if(t.length<2) t.push(i); render(); break; }
+    case 'lavcover': UI.pick.lavCover=UI.pick.lavCover===i?null:i; if(UI.pick.size===2&&UI.pick.lavCover!=null) UI.pick.lavSteal=null; render(); break;
+    case 'lavsteal': { const j=+b.dataset.j, cur2=UI.pick.lavSteal; UI.pick.lavSteal=(cur2&&cur2.from===i&&cur2.idx===j)?null:{from:i,idx:j}; if(UI.pick.size===2&&UI.pick.lavSteal) UI.pick.lavCover=null; render(); break; }
+    case 'confirmplay': commitPlay(); break;
+    case 'next': runQueue(); break;
     case 'coverpick': UI.pick.cover=i; commitPlay(); break;
     case 'slam': slam(); break;
     case 'slamby': slamBy(i); break;
@@ -607,7 +670,7 @@ document.addEventListener('change',e=>{ if(e.target.id==='mods'){UI.mods=e.targe
 /* ---------- Boot ---------- */
 function start(data){
   const saved=(data&&data.G!==undefined)?data.G:lsGet('lto.game',null);
-  if(saved&&saved.players){ G=saved; if(G.over) G=null; }
+  if(saved&&saved.players){ G=saved; if(G.over) G=null; if(G&&G.play&&G.play.kind&&String(G.play.kind).startsWith('det')&&G.play.kind!=='det') G.play=null; }
   const su=(data&&data.UI)||lsGet('lto.ui',null);
   if(su&&su.setup) UI.setup=su.setup.filter(Boolean);
   UI.screen='home';
